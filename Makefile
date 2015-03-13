@@ -1,6 +1,6 @@
-build: lib/libhelpers.so cat/cat
+build: lib/libhelpers.so cat/cat revwords/revwords
 
-lib/libhelpers.so cat/cat:
+lib/libhelpers.so cat/cat revwords/revwords:
 	$(MAKE) -C $(dir $@)
 
 clean:
