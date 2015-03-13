@@ -8,6 +8,7 @@ int main() {
     while (1) {
         int got = read_(STDIN_FILENO, temp_buf, 1000 * sizeof(char));
         if (got < 0) return -1;
+        printf("got: %d\n", got);
         if (got == 0) break;
         int pushed = write_(STDOUT_FILENO, temp_buf, got);
     }
