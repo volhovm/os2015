@@ -1,7 +1,7 @@
 build: lib/libhelpers.so cat/cat
 
 lib/libhelpers.so cat/cat:
-	$(MAKE) -C $(dir $@)
+	$_cl(MAKE) -C $(dir $@)
 
 clean:
 	$(MAKE) -C lib clean

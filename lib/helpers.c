@@ -1,42 +1,43 @@
 #include "helpers.h"
 #include <sys/types.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <limits.h>
 
 ssize_t read_(int fd, void *buf, size_t count) {
-    int pack_size = 30;
+    int got_chars = 0;
     int delimiter_found = 0;
-    while (count > 0 && !delimiter_found) {
-        int got = read(fd, buf, pack_size);
-        count -= got;
+    while (count > got_chars && !delimiter_found) {
+        int got = read(fd, buf, count);
+        if (got == 0) break;
         int i;
         for (i = 0; i < got; i++) {
             if (((char*) buf)[i] == -1) {
                 delimiter_found = 1;
                 break;
             }
-            count--;
+            got_chars++;
         }
         buf += got;
     }
-    return count;
+    return got_chars;
 }
 
 ssize_t write_(int fd, const void *buf, size_t count) {
-    int pack_size = 30;
+    int got_chars = 0;
     int delimiter_found = 0;
-    while (count > 0 && !delimiter_found) {
-        int got = write(fd, buf, pack_size);
-        count -= got;
+    while (count > got_chars && !delimiter_found) {
+        int got = write(fd, buf, count);
+        if (got == 0) break;
         int i;
         for (i = 0; i < got; i++) {
             if (((char*) buf)[i] == -1) {
                 delimiter_found = 1;
                 break;
             }
-            count--;
+            got_chars++;
         }
         buf += got;
     }
-    return count;
+    return got_chars;
 }
