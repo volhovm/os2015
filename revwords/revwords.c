@@ -5,12 +5,13 @@
 #include <stdlib.h>
 
 void main() {
-    char buf[8200];
+    char buf[20];
     int margin = 0;
     while (1) {
-        int got = read_until(STDIN_FILENO, buf + margin * sizeof (char), 4096, ' ');
+        int got = read_until(STDIN_FILENO, buf + margin * sizeof (char), 10, ' ');
         //        write(STDOUT_FILENO, buf + margin * sizeof (char), got);
         if (got == 0) {
+            margin--;
             int j;
             for (j = 0; j < margin / 2; j++) {
                 char temp = buf[margin - j - 1];
@@ -20,7 +21,7 @@ void main() {
             write(STDOUT_FILENO, buf, margin);
             break;
         }
-        printf("got: %d, margin: %d \n", got, margin);
+        //printf("got: %d, margin: %d \n", got, margin);
         int i;
         int last_mark = 0;
         for (i = margin; i < margin + got; i++) {
