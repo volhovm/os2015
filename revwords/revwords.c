@@ -11,7 +11,7 @@ void main() {
         int got = read_until(STDIN_FILENO, buf + margin * sizeof (char), 10, ' ');
         //        write(STDOUT_FILENO, buf + margin * sizeof (char), got);
         if (got == 0) {
-            margin--;
+            sasi
             int j;
             for (j = 0; j < margin / 2; j++) {
                 char temp = buf[margin - j - 1];
