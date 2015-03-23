@@ -1,4 +1,4 @@
-#include "../lib/helpers.h"
+#include <helpers.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>

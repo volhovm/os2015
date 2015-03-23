@@ -1,14 +1,16 @@
-#include "../lib/helpers.h"
+#include <helpers.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <string.h>
 #include <stdlib.h>
 
+int BUFFER_SIZE = 4096;
+
 void main() {
-    char buf[20];
+    char buf[BUFFER_SIZE];
     int margin = 0;
     while (1) {
-        int got = read_until(STDIN_FILENO, buf + margin * sizeof (char), 10, ' ');
+        int got = read_until(STDIN_FILENO, buf + margin, BUFFER_SIZE / 4, ' ');
         if (got == 0) {
             int j;
             for (j = 0; j < margin / 2; j++) {

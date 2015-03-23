@@ -24,7 +24,16 @@ ssize_t read_until(int fd, void * buf, size_t count, char delimiter) {
 }
 
 ssize_t read_(int fd, void *buf, size_t count) {
-    return read_until(fd, buf, count, -1);
+    int got_overall = 0;
+    while (1) {
+        int got = read(fd, buf, count);
+        if (got == 0) break;
+        if (got == -1) return -1;
+        count -= got;
+        got_overall += got;
+    }
+    return got_overall;
+
 }
 
 ssize_t write_(int fd, const void *buf, size_t count) {
