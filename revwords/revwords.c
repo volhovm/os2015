@@ -9,19 +9,16 @@ void main() {
     int margin = 0;
     while (1) {
         int got = read_until(STDIN_FILENO, buf + margin * sizeof (char), 10, ' ');
-        //        write(STDOUT_FILENO, buf + margin * sizeof (char), got);
         if (got == 0) {
-            sasi
             int j;
             for (j = 0; j < margin / 2; j++) {
                 char temp = buf[margin - j - 1];
                 buf[margin - j - 1] = buf[j];
                 buf[j] = temp;
             }
-            write(STDOUT_FILENO, buf, margin);
+            write_(STDOUT_FILENO, buf, margin);
             break;
         }
-        //printf("got: %d, margin: %d \n", got, margin);
         int i;
         int last_mark = 0;
         for (i = margin; i < margin + got; i++) {
@@ -35,13 +32,13 @@ void main() {
                     currstr[tmpsize - j - 1] = currstr[j];
                     currstr[j] = temp;
                 }
-                write(STDOUT_FILENO, currstr, tmpsize);
-                write(STDOUT_FILENO, " ", 1);
+                write_(STDOUT_FILENO, currstr, tmpsize);
+                write_(STDOUT_FILENO, " ", 1);
                 fflush(stdout);
                 last_mark = i + 1;
             }
         }
-        memcpy(buf, buf + last_mark * sizeof (char), got + margin - last_mark + 1);
+        memmove(buf, buf + last_mark * sizeof (char), got + margin - last_mark + 1);
         margin = got + margin - last_mark;
     }
 }
