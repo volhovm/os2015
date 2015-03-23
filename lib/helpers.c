@@ -24,20 +24,33 @@ ssize_t read_until(int fd, void * buf, size_t count, char delimiter) {
 }
 
 ssize_t read_(int fd, void *buf, size_t count) {
-    return read_until(fd, buf, count, -1);
+    int got_overall = 0;
+    while (1) {
+        printf("TEST");
+        int got = read(fd, buf, count);
+        printf("TEST_AFTER");
+        if (got == -1) return -1;
+        if (got == 0) break;
+        fflush(stdout);
+        got_overall += got;
+        buf += got;
+        count -= got;
+    }
+    printf("READ_ EXIT");
+    fflush(stdout);
+
+    return got_overall;
 }
 
 ssize_t write_(int fd, const void *buf, size_t count) {
     int got_chars = 0;
-    int delimiter_found = 0;
-    while (count > got_chars && !delimiter_found) {
+    while (count > got_chars) {
         int got = write(fd, buf, count);
         if (got == 0) break;
         int i;
         got_chars += got;
         for (i = 0; i < got; i++) {
             if (((char*) buf)[i] == -1) {
-                delimiter_found = 1;
                 break;
             }
         }

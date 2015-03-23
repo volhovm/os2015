@@ -6,5 +6,7 @@ lib/libhelpers.so cat/cat revwords/revwords:
 clean:
 	$(MAKE) -C lib clean
 	$(MAKE) -C cat clean
+	$(MAKE) -C revwords clean
+
 
 rebuild: clean build
