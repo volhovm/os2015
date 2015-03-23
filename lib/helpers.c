@@ -58,3 +58,12 @@ ssize_t write_(int fd, const void *buf, size_t count) {
     }
     return got_chars;
 }
+
+int spawn(const char * file, char * const argv []) {
+    size_t n;
+    n = confstr(_CS_PATH, NULL, (size_t) 0);
+    char pathbuf[n];
+    confstr(_CS_PATH, pathbuf, n);
+    printf("%s", pathbuf);
+    return 0;
+}
