@@ -1,4 +1,4 @@
-build: lib/libhelpers.so cat/cat revwords/revwords
+build: lib/libhelpers.so cat/cat revwords/revwords lenwords/lenwords
 
 lib/libhelpers.so cat/cat revwords/revwords:
 	$(MAKE) -C $(dir $@)
