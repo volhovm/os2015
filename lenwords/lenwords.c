@@ -10,7 +10,7 @@ void main() {
     while (1) {
         int got = read_until(STDIN_FILENO, buf + margin, 10, ' ');
         if (got == 0) {
-            char length[1000];
+            char length[4096];
             int out = sprintf(length, "%d", margin);
             write_(STDOUT_FILENO, length, out);
             break;
@@ -20,7 +20,7 @@ void main() {
         for (i = margin; i < margin + got; i++) {
             if (buf[i] == ' ') {
                 int tmpsize = i - last_mark;
-                char length[1000];
+                char length[4096];
                 int out = sprintf(length, "%d ", tmpsize);
                 write_(STDOUT_FILENO, length, out);
                 fflush(stdout);
