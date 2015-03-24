@@ -61,14 +61,10 @@ ssize_t write_(int fd, const void *buf, size_t count) {
 }
 
 int spawn(const char * file, char * const argv []) {
-    //    size_t n;
-    //    n = confstr(_CS_PATH, NULL, (size_t) 0);
-    //    char pathbuf[n];
-    //    confstr(_CS_PATH, pathbuf, n);
     int w, status;
     int cpid = fork();
     if (cpid == -1) {
-    //    perror("fork");
+        perror("fork");
         return -1;
     }
     if (cpid == 0) {
@@ -77,7 +73,6 @@ int spawn(const char * file, char * const argv []) {
             return -1;
         }
     } else {
-        //w = waitpid(cpid, &status, WUNTRACED | WCONTINUED | WNOHANG);
         w = waitpid(cpid, &status, WUNTRACED | WCONTINUED);
         if (!WIFEXITED(status) | WIFSIGNALED(status)) return -1;
         return WEXITSTATUS(status);
