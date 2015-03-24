@@ -77,9 +77,10 @@ int spawn(const char * file, char * const argv []) {
             return -1;
         }
     } else {
-        w = waitpid(cpid, &status, WUNTRACED | WCONTINUED | WNOHANG);
-        if (WIFSIGNALED(w) | WTERMSIG(w) | !WIFEXITED(w)) return -1;
-        return WEXITSTATUS(w);
+        //w = waitpid(cpid, &status, WUNTRACED | WCONTINUED | WNOHANG);
+        w = waitpid(cpid, &status, WUNTRACED | WCONTINUED);
+        if (!WIFEXITED(status) | WIFSIGNALED(status)) return -1;
+        return WEXITSTATUS(status);
     }
     return 0;
 }
