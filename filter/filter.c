@@ -6,5 +6,6 @@
 
 void main() {
     char *buf;
-    spawn(buf, buf);
+    char *args[] = {"cat", "/proc/cpuinfo", NULL};
+    spawn("cat", args);
 }

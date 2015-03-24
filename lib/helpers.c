@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <limits.h>
+#include <sys/wait.h>
 
 ssize_t read_until(int fd, void * buf, size_t count, char delimiter) {
     int got_chars = 0;
@@ -60,10 +61,25 @@ ssize_t write_(int fd, const void *buf, size_t count) {
 }
 
 int spawn(const char * file, char * const argv []) {
-    size_t n;
-    n = confstr(_CS_PATH, NULL, (size_t) 0);
-    char pathbuf[n];
-    confstr(_CS_PATH, pathbuf, n);
-    printf("%s", pathbuf);
+    //    size_t n;
+    //    n = confstr(_CS_PATH, NULL, (size_t) 0);
+    //    char pathbuf[n];
+    //    confstr(_CS_PATH, pathbuf, n);
+    int w, status;
+    int cpid = fork();
+    if (cpid == -1) {
+    //    perror("fork");
+        return -1;
+    }
+    if (cpid == 0) {
+        if (execvp(file, argv) == -1) {
+            perror("execvp");
+            return -1;
+        }
+    } else {
+        w = waitpid(cpid, &status, WUNTRACED | WCONTINUED | WNOHANG);
+        if (WIFSIGNALED(w) | WTERMSIG(w) | !WIFEXITED(w)) return -1;
+        return WEXITSTATUS(w);
+    }
     return 0;
 }
