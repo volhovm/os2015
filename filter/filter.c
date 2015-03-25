@@ -1,3 +1,4 @@
+#include "filter.h"
 #include <helpers.h>
 #include <fcntl.h>
 #include <sys/stat.h>
