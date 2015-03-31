@@ -1,4 +1,4 @@
-#include "helpers.h"
+#include <helpers.h>
 #include <sys/types.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -74,6 +74,7 @@ int spawn(const char * file, char * const argv []) {
         }
     } else {
         w = waitpid(cpid, &status, WUNTRACED | WCONTINUED);
+        if (w == -1) return -1;
         if (!WIFEXITED(status) | WIFSIGNALED(status)) return -1;
         return WEXITSTATUS(status);
     }

@@ -1,6 +1,6 @@
+#include <bufio.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <bufio.h>
 
 void chnl(struct buf_t* buf) {
 #ifdef DEBUG

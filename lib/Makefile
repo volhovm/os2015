@@ -1,12 +1,10 @@
-all: libbufio.so
+all: libbufio.so libhelpers.so
 
 libbufio.so: bufio.c bufio.h
-	gcc -shared -Wall -I. -fpic -o libbufio.so $<
+	gcc -o libbufio.so bufio.c -shared -Wall -I. -fpic
 
-libhelpers.so: helpers.o
-	gcc -o libhelpers.so -shared -Wall -I. helpers.o
-helpers.o: helpers.c helpers.h
-	gcc -fpic -c helpers.c
+libhelpers.so: helpers.c helpers.h
+	gcc -o libhelpers.so helpers.c -shared -Wall -I. -fpic
 
 clean:
 	rm -f *.o *.so
