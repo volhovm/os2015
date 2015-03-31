@@ -1,5 +1,6 @@
 #include <bufio.h>
 #include <stdio.h>
+#include <unistd.h>
 #include <stdlib.h>
 
 void chnl(struct buf_t* buf) {
@@ -40,10 +41,30 @@ size_t buf_size(struct buf_t* buf) {
 
 ssize_t buf_fill(fd_t fd, struct buf_t* buf, size_t required) {
     chnl(buf);
-    return 0;
+#ifdef DEBUG
+    if (required > buf->capacity) abort();
+#endif
+    while (buf->size < required) {
+        int got = read(fd, buf->data + buf_size(buf),
+                       buf->capacity - buf->size);
+        if (got == -1) return -1;
+        if (got == 0) break;
+        buf->size += got;
+    }
+    return buf->size;
 }
 
 ssize_t buf_flush(fd_t fd, struct buf_t *buf, size_t required) {
     chnl(buf);
-    return -1;
+    int prev_size = buf->size;
+    int written = 0;
+    while (written < required) {
+        int got = write(fd, buf->data + written, prev_size - written);
+        if (got == -1) return -1;
+        if (got == 0) break;
+        written += got;
+    }
+    memmove(buf->data, buf->data + written, prev_size - written);
+    buf->size = prev_size - written;
+    return buf->size - prev_size;
 }
