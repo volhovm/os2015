@@ -1,6 +1,7 @@
 #include <bufio.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <string.h>
 #include <stdlib.h>
 
 void chnl(struct buf_t* buf) {
