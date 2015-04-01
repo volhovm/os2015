@@ -8,6 +8,7 @@ int main() {
     int res1, res2;
     while (1) {
         res1 = buf_fill(STDIN_FILENO, buf, 1);
+        if (res1 == 0 && buf_size(buf) == 0) break;
         res2 = buf_flush(STDOUT_FILENO, buf, buf_size(buf));
         if (res1 == -1 || res2 == -1) break;
     }
