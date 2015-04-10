@@ -1,6 +1,6 @@
 build: lib/libhelpers.so lib/libbufio.so cat/cat revwords/revwords filter/filter bufcat/bufcat
 
-lib/libhelpers.so lib/libbufio.so cat/cat revwords/revwords filter/filter:
+lib/libhelpers.so lib/libbufio.so cat/cat revwords/revwords filter/filter bufcat/bufcat:
 	$(MAKE) -C $(dir $@)
 
 clean:
