@@ -23,7 +23,7 @@ void spawn_without_io(char* file, int newargs, char* newarg, int argc, char* arg
     fflush(stdout);
     if (res == 0) {
         write(STDOUT_FILENO, argv[argc - 2], newargs);
-        write(STDOUT_FILENO, " ", 1);
+        write(STDOUT_FILENO, "\n", 1);
         fflush(stdout);
     }
 }
