@@ -16,10 +16,12 @@ void spawn_without_io(char* file, char* newarg, int argc, char* argv[], struct b
     int stdoutdub, res;
     argv[argc - 2] = newarg;
     stdoutdub = dup(1);          // backup for stdout
-    close(1);                    // fd 1 is free now
-    open("/dev/null", O_WRONLY); // must take the fd 1
+    int other = open("/dev/null", O_WRONLY); // must take the fd 1
+    dup2(other, 1);
     res = spawn(file, argv);
     dup2(stdoutdub, 1);          // recover stdout
+    close(other);
+    close(stdoutdub);
     //    printf("spawned %s with %s of size %d, got %d", file, newarg, newargs, res);
     if (res == 0) {
         buf_write(STDOUT_FILENO, buf, newarg, strlen(newarg));
