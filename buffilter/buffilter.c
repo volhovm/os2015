@@ -12,7 +12,7 @@
 int BUFFER_SIZE = 4096;
 
 // Calling spawn, temporarily routing stdin to /dev/null
-void spawn_without_io(char* file, int newargs, char* newarg, int argc, char* argv[]) {
+void spawn_without_io(char* file, char* newarg, int argc, char* argv[], struct buf_t* buf) {
     int stdoutdub, res;
     argv[argc - 2] = newarg;
     stdoutdub = dup(1);          // backup for stdout
@@ -20,12 +20,10 @@ void spawn_without_io(char* file, int newargs, char* newarg, int argc, char* arg
     open("/dev/null", O_WRONLY); // must take the fd 1
     res = spawn(file, argv);
     dup2(stdoutdub, 1);          // recover stdout
-    fflush(stdout);
     //    printf("spawned %s with %s of size %d, got %d", file, newarg, newargs, res);
     if (res == 0) {
-        write(STDOUT_FILENO, newarg, newargs);
-        write(STDOUT_FILENO, " ", 1);
-        fflush(stdout);
+        buf_write(STDOUT_FILENO, buf, newarg, strlen(newarg));
+        buf_write(STDOUT_FILENO, buf, " ", 1);
     }
 }
 
@@ -34,7 +32,8 @@ void main(int argc, char* argv[]) {
     char* util_name = argv[1];
     char* args[argc + 1];
     char last_arg[4096];
-    struct buf_t* buf = buf_new(BUFFER_SIZE);
+    struct buf_t* bufin = buf_new(BUFFER_SIZE);
+    struct buf_t* bufout = buf_new(BUFFER_SIZE);
     for (i = 1; i < argc; i++) {
         args[i-1] = argv[i];
     }
@@ -42,9 +41,11 @@ void main(int argc, char* argv[]) {
     // args[argc - 1] is the place for n+1th argument
 
     while (1) {
-        got = buf_getline(STDIN_FILENO, buf, last_arg);
-        //printf("SPAWNING\n");
+        got = buf_getline(STDIN_FILENO, bufin, last_arg);
         if (got == 0) break;
-        spawn_without_io(util_name, strlen(last_arg), last_arg, argc + 1, args);
+        spawn_without_io(util_name, last_arg, argc + 1, args, bufout);
     }
+    buf_flush(STDOUT_FILENO, bufout, buf_size(bufout));
+    buf_free(bufin);
+    buf_free(bufout);
 }

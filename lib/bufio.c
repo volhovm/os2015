@@ -78,7 +78,6 @@ ssize_t buf_getline(fd_t fd, struct buf_t* buf, char* dest) {
                 dest[j] = ((char*) buf->data)[j];
             }
             dest[i] = 0;
-            fflush(stdout);
             memmove(buf->data, buf->data + i + 1, buf->size - i - 1);
             buf->size = buf->size - i - 1;
             return i;
@@ -89,7 +88,6 @@ ssize_t buf_getline(fd_t fd, struct buf_t* buf, char* dest) {
         got = buf_fill(fd, buf, 1);
         if (got == 0) return 0;
         if (size == got) {
-            fflush(stdout);
             for (j = 0; j < got; j++) {
                 dest[j] = ((char*) buf->data)[j];
             }
@@ -108,11 +106,26 @@ ssize_t buf_getline(fd_t fd, struct buf_t* buf, char* dest) {
                 return i;
             }
         }
-
     }
     return -1;
 }
 
 ssize_t buf_write(fd_t fd, struct buf_t* buf, char* src, size_t len) {
-    return 0;
+    //    printf("in buf_write with src: %s, len: %d, buf_size: %d of %d\n", src, len, buf->size, buf->capacity);
+    //    fflush(stdout);
+    int newlen, res;
+    while (1) {
+        if (buf->size + len < buf->capacity) {
+            memmove(buf->data + buf->size, src, len);
+            buf->size = buf->size + len;
+            return len;
+        }
+        newlen = buf->size - len;
+        memmove(buf->data + buf->size, src, newlen);
+        buf->size = buf->capacity;
+        src += newlen;
+        len -= newlen;
+        res = buf_flush(fd, buf, 1);
+        if (res < 0) return -1;
+    }
 }

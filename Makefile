@@ -9,5 +9,6 @@ clean:
 	$(MAKE) -C revwords clean
 	$(MAKE) -C filter clean
 	$(MAKE) -C bufcat clean
+	$(MAKE) -C buffilter clean
 
 rebuild: clean build
