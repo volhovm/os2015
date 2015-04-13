@@ -1,6 +1,7 @@
-build: lib/libhelpers.so lib/libbufio.so cat/cat revwords/revwords filter/filter bufcat/bufcat buffilter/buffilter
+build: lib/libhelpers.so lib/libbufio.so cat/cat revwords/revwords \
+	lenwords/lenwords filter/filter bufcat/bufcat buffilter/buffilter
 
-lib/libhelpers.so lib/libbufio.so cat/cat revwords/revwords filter/filter bufcat/bufcat buffilter/buffilter:
+lib/libhelpers.so lib/libbufio.so cat/cat revwords/revwords lenwords/lenwords filter/filter bufcat/bufcat buffilter/buffilter:
 	$(MAKE) -C $(dir $@)
 
 clean:
@@ -10,5 +11,6 @@ clean:
 	$(MAKE) -C filter clean
 	$(MAKE) -C bufcat clean
 	$(MAKE) -C buffilter clean
+	$(MAKE) -C lenwords clean
 
 rebuild: clean build
