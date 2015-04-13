@@ -25,7 +25,7 @@ void spawn_without_io(char* file, char* newarg, int argc, char* argv[], struct b
     //    printf("spawned %s with %s of size %d, got %d", file, newarg, newargs, res);
     if (res == 0) {
         buf_write(STDOUT_FILENO, buf, newarg, strlen(newarg));
-        buf_write(STDOUT_FILENO, buf, " ", 1);
+        buf_write(STDOUT_FILENO, buf, "\n", 1);
     }
 }
 
