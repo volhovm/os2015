@@ -74,9 +74,7 @@ ssize_t buf_getline(fd_t fd, struct buf_t* buf, char* dest) {
     int i, j, size, got;
     for (i = 0; i < buf->size; i++) {
         if (((char*) buf->data)[i] == '\n') {
-            for (j = 0; j < i; j++) {
-                dest[j] = ((char*) buf->data)[j];
-            }
+            memmove(dest, buf->data, i);
             dest[i] = 0;
             memmove(buf->data, buf->data + i + 1, buf->size - i - 1);
             buf->size = buf->size - i - 1;
@@ -88,18 +86,14 @@ ssize_t buf_getline(fd_t fd, struct buf_t* buf, char* dest) {
         got = buf_fill(fd, buf, 1);
         if (got == 0) return 0;
         if (size == got) {
-            for (j = 0; j < got; j++) {
-                dest[j] = ((char*) buf->data)[j];
-            }
-            dest[got+1] = 0;
+            memmove(dest, buf->data, buf->size);
+            dest[got] = 0;
             buf->size = 0;
             return got;
         }
         for (i = size; i < buf->size; i++) {
             if (((char*) buf->data)[i] == '\n') {
-                for (j = 0; j < i; j++) {
-                    dest[j] = ((char*) buf->data)[j];
-                }
+                memmove(dest, buf->data, i);
                 dest[i] = 0;
                 memmove(buf->data, buf->data + i + 1 , buf->size - i - 1);
                 buf->size = size - i + got - 1;
