@@ -72,17 +72,18 @@ ssize_t buf_flush(fd_t fd, struct buf_t *buf, size_t required) {
 
 ssize_t buf_getline(fd_t fd, struct buf_t* buf, char* dest) {
     int i, j, size, got;
-    for (i = 0; i < buf->size; i++) {
-        if (((char*) buf->data)[i] == '\n') {
-            memmove(dest, buf->data, i);
-            dest[i] = 0;
-            memmove(buf->data, buf->data + i + 1, buf->size - i - 1);
-            buf->size = buf->size - i - 1;
-            return i;
-        }
-    }
+    int start = 0;
     size = buf->size;
     while (buf->size < buf->capacity) {
+        for (i = start; i < buf->size; i++) {
+            if (((char*) buf->data)[i] == '\n') {
+                memmove(dest, buf->data, i);
+                dest[i] = 0;
+                memmove(buf->data, buf->data + i + 1, buf->size - i - 1);
+                buf->size = buf->size - i - 1;
+                return i;
+            }
+        }
         got = buf_fill(fd, buf, 1);
         if (got == 0) return 0;
         if (size == got) {
@@ -91,22 +92,22 @@ ssize_t buf_getline(fd_t fd, struct buf_t* buf, char* dest) {
             buf->size = 0;
             return got;
         }
-        for (i = size; i < buf->size; i++) {
-            if (((char*) buf->data)[i] == '\n') {
-                memmove(dest, buf->data, i);
-                dest[i] = 0;
-                memmove(buf->data, buf->data + i + 1 , buf->size - i - 1);
-                buf->size = size - i + got - 1;
-                return i;
-            }
-        }
+        start = size;
+        size = buf->size;
+        //        for (i = size; i < buf->size; i++) {
+        //            if (((char*) buf->data)[i] == '\n') {
+        //                memmove(dest, buf->data, i);
+        //                dest[i] = 0;
+        //                memmove(buf->data, buf->data + i + 1 , buf->size - i - 1);
+        //                buf->size = size - i + got - 1;
+        //                return i;
+        //            }
+        //        }
     }
     return -1;
 }
 
 ssize_t buf_write(fd_t fd, struct buf_t* buf, char* src, size_t len) {
-    //    printf("in buf_write with src: %s, len: %d, buf_size: %d of %d\n", src, len, buf->size, buf->capacity);
-    //    fflush(stdout);
     int newlen, res;
     while (1) {
         if (buf->size + len < buf->capacity) {
