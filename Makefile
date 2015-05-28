@@ -1,7 +1,8 @@
 build: lib/libhelpers.so lib/libbufio.so cat/cat revwords/revwords \
-	lenwords/lenwords filter/filter bufcat/bufcat buffilter/buffilter
+	lenwords/lenwords filter/filter bufcat/bufcat buffilter/buffilter \
+	simplesh/simplesh
 
-lib/libhelpers.so lib/libbufio.so cat/cat revwords/revwords lenwords/lenwords filter/filter bufcat/bufcat buffilter/buffilter:
+lib/libhelpers.so lib/libbufio.so cat/cat revwords/revwords lenwords/lenwords filter/filter bufcat/bufcat buffilter/buffilter simplesh/simplesh:
 	$(MAKE) -C $(dir $@)
 
 clean:
@@ -12,5 +13,6 @@ clean:
 	$(MAKE) -C bufcat clean
 	$(MAKE) -C buffilter clean
 	$(MAKE) -C lenwords clean
+	$(MAKE) -C simplesh clean
 
 rebuild: clean build
