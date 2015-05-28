@@ -5,7 +5,7 @@
 #include <limits.h>
 #include <sys/wait.h>
 
-ssize_t read_until(int fd, void * buf, size_t count, char delimiter) {
+ssize_t read_until(int fd, void* buf, size_t count, char delimiter) {
     int got_chars = 0;
     int delimiter_found = 0;
     while (count > got_chars && !delimiter_found) {
@@ -24,7 +24,7 @@ ssize_t read_until(int fd, void * buf, size_t count, char delimiter) {
     return got_chars;
 }
 
-ssize_t read_(int fd, void *buf, size_t count) {
+ssize_t read_(int fd, void* buf, size_t count) {
     int got_overall = 0;
     while (1) {
         printf("TEST");
@@ -43,7 +43,7 @@ ssize_t read_(int fd, void *buf, size_t count) {
     return got_overall;
 }
 
-ssize_t write_(int fd, const void *buf, size_t count) {
+ssize_t write_(int fd, const void* buf, size_t count) {
     int got_chars = 0;
     while (count > got_chars) {
         int got = write(fd, buf, count);
@@ -60,7 +60,7 @@ ssize_t write_(int fd, const void *buf, size_t count) {
     return got_chars;
 }
 
-int spawn(const char * file, char * const argv []) {
+int spawn(const char* file, char* const argv []) {
     int w, status;
     int cpid = fork();
     if (cpid == -1) {
@@ -79,4 +79,16 @@ int spawn(const char * file, char * const argv []) {
         return WEXITSTATUS(status);
     }
     return 0;
+}
+
+struct execargs_t* execargs_new(char* name, char** args) {
+    return NULL;
+}
+
+int exec(struct execargs_t* args) {
+    return 1;
+}
+
+int runpiped(struct execargs_t** programs, size_t n) {
+    return 1;
 }
