@@ -3,10 +3,13 @@
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
+#include <signal.h>
 #include <unistd.h>
 #include <limits.h>
 #include <stdlib.h>
 #include <sys/wait.h>
+
+#define SAFERET(a) if (a == -1) return -1;
 
 ssize_t read_until(int fd, void* buf, size_t count, char delimiter) {
     int got_chars = 0;
@@ -77,7 +80,7 @@ int spawn(const char* file, char* const argv []) {
         }
     } else {
         w = waitpid(cpid, &status, WUNTRACED | WCONTINUED);
-        if (w == -1) return -1;
+        SAFERET(w);
         if (!WIFEXITED(status) | WIFSIGNALED(status)) return -1;
         return WEXITSTATUS(status);
     }
@@ -103,20 +106,38 @@ int exec(struct execargs_t* args) {
     return spawn(args->name, args->args);
 }
 
-int runpiped1(struct execargs_t** programs, size_t n, int write_to) {
+// Removes all pending signals and unblock the mask
+// returns -1 if EINTR
+int signals_unblock(sigset_t* smask) {
+    struct timespec timeout;
+    timeout.tv_sec=0;
+    timeout.tv_nsec=10;
+    siginfo_t info;
+    while (1) {
+        int res = sigtimedwait(smask, &info, &timeout);
+        if (res == -1) {
+            if (errno == EAGAIN) break;
+            sigprocmask(SIG_UNBLOCK, smask, NULL);
+            return -1;
+        }
+    }
+
+    sigprocmask(SIG_UNBLOCK, smask, NULL);
+    return 0;
+}
+
+int runpiped1(struct execargs_t** programs, size_t n, int write_to, sigset_t* smask) {
     //printf("\nstate: %d %d\n", n, write_to);
     if (n == 1) {
         int res = dup2(write_to, STDOUT_FILENO);
-        if (res == -1) {
-            return -1;
-        }
+        SAFERET(res);
         exec(programs[0]);
         return 0;
     }
     int pid;
     int pipefd[2];
     int res = pipe(pipefd);
-    if (res == -1) return -1;
+    SAFERET(res);
     pid = fork();
     if (pid == -1) {
         perror("fork");
@@ -124,21 +145,42 @@ int runpiped1(struct execargs_t** programs, size_t n, int write_to) {
     }
     if (pid == 0) {
         close(pipefd[0]);
-        return runpiped1(programs, n-1, pipefd[1]);
+        //close(STDERR_FILENO);
+        return runpiped1(programs, n-1, pipefd[1], smask);
     } else {
+        printf("Forked: %d", pid);
+        fflush(stdout);
         close(pipefd[1]);
-        if (dup2(write_to, STDOUT_FILENO) == -1) return -1;
+
+        int stdout_backup = dup(STDOUT_FILENO);
+        SAFERET(stdout_backup);
         int stdin_backup = dup(STDIN_FILENO);
-        if (stdin_backup == -1) return -1;
-        if (dup2(pipefd[0], STDIN_FILENO) == -1) return -1;
+        SAFERET(stdin_backup);
+
+        SAFERET(dup2(write_to, STDOUT_FILENO));
+        SAFERET(dup2(pipefd[0], STDIN_FILENO));
         exec(programs[n - 1]);
-        if (dup2(stdin_backup, STDIN_FILENO) == -1) return -1;
+        SAFERET(dup2(stdin_backup, STDIN_FILENO));
+        SAFERET(dup2(stdout_backup, STDOUT_FILENO));
+
+        siginfo_t siginfo;
+        int sig = sigwaitinfo(smask, &siginfo);
+        SAFERET(sig);
+
         int status;
+        close(pipefd[0]);
         waitpid(pid, &status, 0);
         return WEXITSTATUS(status);
     }
 }
 
 int runpiped(struct execargs_t** programs, size_t n) {
-    return runpiped1(programs, n, STDOUT_FILENO);
+    sigset_t smask;
+    sigemptyset(&smask);
+    sigaddset(&smask, SIGINT);
+    sigaddset(&smask, SIGCHLD);
+    sigprocmask(SIG_BLOCK, &smask, NULL);
+    int res = runpiped1(programs, n, STDOUT_FILENO, &smask);
+    sigprocmask(SIG_UNBLOCK, &smask, NULL);
+    return res;
 }
