@@ -79,7 +79,7 @@ int spawn(const char* file, char* const argv []) {
             return -1;
         }
     } else {
-        w = waitpid(cpid, &status, WUNTRACED | WCONTINUED);
+        w = waitpid(cpid, &status, 0);
         SAFERET(w);
         if (!WIFEXITED(status) | WIFSIGNALED(status)) return -1;
         return WEXITSTATUS(status);
@@ -102,13 +102,44 @@ struct execargs_t* execargs_fromargs(char** args) {
     return execargs_new(args[0], args);
 }
 
-int exec(struct execargs_t* args) {
-    return spawn(args->name, args->args);
+// executes a given program.
+// returns exit status of program
+int exec(struct execargs_t* prog) {
+    return spawn(prog->name, prog->args);
+    //    int w, status;
+    //    int cpid = fork();
+    //    if (cpid == -1) {
+    //        perror("fork");
+    //        return -1;
+    //    }
+    //    if (cpid == 0) {
+    //        if (execvp(args->name, args->args) == -1) {
+    //            perror("execvp");
+    //            return -1;
+    //        }
+    //    } else {
+    //        w = waitpid(cpid, &status, 0);
+    //        SAFERET(w);
+    //        if (!WIFEXITED(status) | WIFSIGNALED(status)) return -WTERMSIG(status)-1;
+    //        return WEXITSTATUS(status);
+    //    }
+    //    return 0;
+}
+
+// Removes signal id if any signal is pending, 0 otherwise, -1 if error
+int signals_first(const sigset_t* smask) {
+    struct timespec timeout;
+    timeout.tv_sec=0;
+    timeout.tv_nsec=10;
+    siginfo_t info;
+    int res = sigtimedwait(smask, &info, &timeout);
+    if (res == -1 && errno == EAGAIN) return 0;
+    return res;
 }
 
 // Removes all pending signals and unblock the mask
 // returns -1 if EINTR
-int signals_unblock(sigset_t* smask) {
+int signals_unblock(const sigset_t* smask) {
     struct timespec timeout;
     timeout.tv_sec=0;
     timeout.tv_nsec=10;
@@ -132,11 +163,12 @@ int runpiped1(struct execargs_t** programs, size_t n, int write_to, sigset_t* sm
         int res = dup2(write_to, STDOUT_FILENO);
         SAFERET(res);
         exec(programs[0]);
+        close(write_to);
         return 0;
     }
-    int pid;
+    int pid, sig, res;
     int pipefd[2];
-    int res = pipe(pipefd);
+    res = pipe(pipefd);
     SAFERET(res);
     pid = fork();
     if (pid == -1) {
@@ -148,29 +180,58 @@ int runpiped1(struct execargs_t** programs, size_t n, int write_to, sigset_t* sm
         //close(STDERR_FILENO);
         return runpiped1(programs, n-1, pipefd[1], smask);
     } else {
+        int childkilled = 0;
+        int retcode = 0;
         printf("Forked: %d", pid);
         fflush(stdout);
         close(pipefd[1]);
 
+        // preserve stdout, stdin
         int stdout_backup = dup(STDOUT_FILENO);
         SAFERET(stdout_backup);
         int stdin_backup = dup(STDIN_FILENO);
         SAFERET(stdin_backup);
 
+        // dup2 new descriptors to stdout, stdin
         SAFERET(dup2(write_to, STDOUT_FILENO));
         SAFERET(dup2(pipefd[0], STDIN_FILENO));
-        exec(programs[n - 1]);
-        SAFERET(dup2(stdin_backup, STDIN_FILENO));
-        SAFERET(dup2(stdout_backup, STDOUT_FILENO));
 
-        siginfo_t siginfo;
-        int sig = sigwaitinfo(smask, &siginfo);
+        // process all signals that could be generated up to this point
+        // if SIGINT, kill child, else execute the given program
+        sig = signals_first(smask);
         SAFERET(sig);
-
-        int status;
+        if (sig == SIGTERM) {
+            kill(pid, SIGINT);
+        } else {
+            if (sig == SIGCHLD) childkilled = 1;
+            res = exec(programs[n - 1]);
+            SAFERET(res);
+            // if we were interrupted during execution of given program, kill child
+            if (res == -SIGINT-1) {
+                SAFERET(kill(pid, SIGINT));
+            }
+            SAFERET(dup2(stdin_backup, STDIN_FILENO));
+        }
+        if (childkilled) {
+            close(pipefd[0]);
+            return 0;
+        } else {
+            siginfo_t siginfo;
+            while (1) {
+                sig = sigwaitinfo(smask, &siginfo);
+                SAFERET(sig);
+                // if got SIGCHLD, save return code and that's all
+                // if got signal from parent (SIGINT), propagate to child and wait for SIGCHLD
+                if (sig == SIGINT) {
+                    SAFERET(kill(pid, SIGINT));
+                } else if (sig == SIGCHLD) {
+                    retcode = siginfo.si_status;
+                    break;
+                }
+            }
+        }
         close(pipefd[0]);
-        waitpid(pid, &status, 0);
-        return WEXITSTATUS(status);
+        return retcode;
     }
 }
 
@@ -180,7 +241,33 @@ int runpiped(struct execargs_t** programs, size_t n) {
     sigaddset(&smask, SIGINT);
     sigaddset(&smask, SIGCHLD);
     sigprocmask(SIG_BLOCK, &smask, NULL);
-    int res = runpiped1(programs, n, STDOUT_FILENO, &smask);
-    sigprocmask(SIG_UNBLOCK, &smask, NULL);
-    return res;
+
+    int pid = fork();
+    if (pid == 0) {
+        int res = runpiped1(programs, n, STDOUT_FILENO, &smask);
+        signals_unblock(&smask);
+        return res;
+    } else {
+        // wait for any signal
+        siginfo_t siginfo;
+        int sig, retvalue = 0;
+
+        // kill child in case of SIGINT, in case of SIGCHLD exit normally
+        while (1) {
+            sig = sigwaitinfo(&smask, &siginfo);
+            SAFERET(sig);
+
+            printf("sig is %d\n", sig);
+            fflush(stdout);
+
+            if (sig == SIGINT) {
+                SAFERET(kill(pid, SIGINT));
+            } else if (sig == SIGCHLD) {
+                retvalue = siginfo.si_status;
+                break;
+            }
+        }
+        signals_unblock(&smask);
+        return retvalue;
+    }
 }
