@@ -1,5 +1,6 @@
 #include <helpers.h>
 #include <sys/types.h>
+#include <assert.h>
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
@@ -9,7 +10,7 @@
 #include <stdlib.h>
 #include <sys/wait.h>
 
-#define SAFERET(a) if (a == -1) return -1;
+#define SAFERET(a) if (a == -1) { printf("SUPER ERROR"); return -1; }
 
 ssize_t read_until(int fd, void* buf, size_t count, char delimiter) {
     int got_chars = 0;
@@ -158,43 +159,31 @@ int signals_unblock(const sigset_t* smask) {
 }
 
 int runpiped1(struct execargs_t** programs, size_t n, int write_to, sigset_t* smask) {
-    //printf("\nstate: %d %d\n", n, write_to);
-    if (n == 1) {
-        int res = dup2(write_to, STDOUT_FILENO);
-        SAFERET(res);
-        exec(programs[0]);
-        close(write_to);
-        return 0;
-    }
-    int pid, sig, res;
+    assert(n > 0);
+    int pid, sig, res, status;
     int pipefd[2];
     res = pipe(pipefd);
     SAFERET(res);
-    pid = fork();
+    pid = fork(); // child executes n-1 program, parent is running n'th
     if (pid == -1) {
         perror("fork");
         return -1;
     }
+
     if (pid == 0) {
         close(pipefd[0]);
-        //close(STDERR_FILENO);
-        return runpiped1(programs, n-1, pipefd[1], smask);
+        if (n == 1) {
+            SAFERET(close(pipefd[1]));
+            return 0;
+        } else {
+            return runpiped1(programs, n - 1, pipefd[1], smask);
+        }
     } else {
+        siginfo_t siginfo;
         int childkilled = 0;
         int retcode = 0;
-        printf("Forked: %d", pid);
-        fflush(stdout);
+        printf("depth %zu:: Forked: %d\n", n, pid);
         close(pipefd[1]);
-
-        // preserve stdout, stdin
-        int stdout_backup = dup(STDOUT_FILENO);
-        SAFERET(stdout_backup);
-        int stdin_backup = dup(STDIN_FILENO);
-        SAFERET(stdin_backup);
-
-        // dup2 new descriptors to stdout, stdin
-        SAFERET(dup2(write_to, STDOUT_FILENO));
-        SAFERET(dup2(pipefd[0], STDIN_FILENO));
 
         // process all signals that could be generated up to this point
         // if SIGINT, kill child, else execute the given program
@@ -204,33 +193,81 @@ int runpiped1(struct execargs_t** programs, size_t n, int write_to, sigset_t* sm
             kill(pid, SIGINT);
         } else {
             if (sig == SIGCHLD) childkilled = 1;
-            res = exec(programs[n - 1]);
-            SAFERET(res);
-            // if we were interrupted during execution of given program, kill child
-            if (res == -SIGINT-1) {
-                SAFERET(kill(pid, SIGINT));
-            }
-            SAFERET(dup2(stdin_backup, STDIN_FILENO));
-        }
-        if (childkilled) {
-            close(pipefd[0]);
-            return 0;
-        } else {
-            siginfo_t siginfo;
-            while (1) {
-                sig = sigwaitinfo(smask, &siginfo);
-                SAFERET(sig);
-                // if got SIGCHLD, save return code and that's all
-                // if got signal from parent (SIGINT), propagate to child and wait for SIGCHLD
-                if (sig == SIGINT) {
-                    SAFERET(kill(pid, SIGINT));
-                } else if (sig == SIGCHLD) {
-                    retcode = siginfo.si_status;
-                    break;
+
+            // start program #n-1
+            int cpid = fork();
+            SAFERET(cpid);
+            if (cpid == 0) {
+                // let execed child response to SIGINT and SIGCHLD (work as it should)
+                signals_unblock(smask);
+                // dup2 new descriptors to stdout, stdin
+                SAFERET(dup2(write_to, STDOUT_FILENO));
+                SAFERET(dup2(pipefd[0], STDIN_FILENO));
+                // close init fds
+                SAFERET(close(write_to));
+                SAFERET(close(pipefd[0]));
+                if (execvp(programs[n-1]->name, programs[n-1]->args) == -1) {
+                    perror("execvp");
+                    return -1;
+                }
+            } else {
+                int execed_dead = 0;
+                int newpid;
+                printf("depth %zu:: exec'ed %d\n", n, cpid);
+                // sent SIGINT to child if needed and wait for its execution end
+                while (!execed_dead) {
+                    printf("depth %zu:: waiting for a signal after exec\n", n);
+                    sig = sigwaitinfo(smask, &siginfo);
+                    SAFERET(sig);
+                    if (sig == SIGINT) {
+                        printf("depth %zu:: got sigint, relaying it to exec-chld (%d)\n", n, cpid);
+                        SAFERET(kill(cpid, SIGINT));
+                        if (!childkilled) {
+                            //printf("depth %zu:: and to direct child %d\n", n, pid);
+                            SAFERET(kill(pid, SIGINT));
+                        }
+                    } else if (sig == SIGCHLD) {
+                        // wait all closed childs (max 2) to prevent zombie creation
+                        while ( (newpid = waitpid(-1, &status, WNOHANG)) != -1
+                                && errno != ECHILD ) {
+                            if (newpid == -1) {
+                                perror("wait");
+                                return -1;
+                            }
+                            if (newpid == pid) {
+                                retcode = siginfo.si_status;
+                                childkilled = 1;
+                                printf("depth %zu:: previous-chain child #%d died\n", n, pid);
+                            } else if (newpid == cpid) {
+                                SAFERET(close(pipefd[0]));
+                                execed_dead = 1;
+                                printf("depth %zu:: exec'ed child #%d has finished\n", n, cpid);
+                            }
+                        }
+                    }
                 }
             }
+            // the exec'ed program is done by here, and we have to wait for SIGINT
+            // or child death (if it hasn't happened due to this point).
         }
-        close(pipefd[0]);
+
+        printf("depth %zu:: before last while\n", n);
+        while (!childkilled) {
+            sig = sigwaitinfo(smask, &siginfo);
+            SAFERET(sig);
+            printf("depth %zu:: got signal %d in last while\n", n, sig);
+            // if got SIGCHLD, wait pid, save return code and return
+            // if got signal from parent (SIGINT), propagate to child and wait for SIGCHLD
+            if (sig == SIGINT) {
+                // ignored, each process child gets it's SIGTERM automatically
+                //SAFERET(kill(pid, SIGINT));
+            } else if (sig == SIGCHLD) {
+                SAFERET(waitpid(pid, &status, WNOHANG));
+                retcode = siginfo.si_status;
+                childkilled = 1;
+            }
+        }
+        printf("depth %zu:: exiting\n", n);
         return retcode;
     }
 }
@@ -248,21 +285,22 @@ int runpiped(struct execargs_t** programs, size_t n) {
         signals_unblock(&smask);
         return res;
     } else {
+        printf("master:: Forked init: %d\n", pid);
         // wait for any signal
         siginfo_t siginfo;
-        int sig, retvalue = 0;
+        int sig, status, retvalue = 0;
 
         // kill child in case of SIGINT, in case of SIGCHLD exit normally
         while (1) {
             sig = sigwaitinfo(&smask, &siginfo);
             SAFERET(sig);
 
-            printf("sig is %d\n", sig);
-            fflush(stdout);
+            printf("master:: sig is %d\n", sig);
 
             if (sig == SIGINT) {
                 SAFERET(kill(pid, SIGINT));
             } else if (sig == SIGCHLD) {
+                SAFERET(waitpid(pid, &status, WNOHANG));
                 retvalue = siginfo.si_status;
                 break;
             }

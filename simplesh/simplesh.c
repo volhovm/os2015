@@ -3,6 +3,7 @@
 #include <stdio.h>
 
 main() {
+    setbuf(stdout, NULL);
     char* args_raw1[] = {"find", "/", NULL};
     char* args_raw2[] = {"sleep", "5", NULL};
     struct execargs_t* programs[2];
