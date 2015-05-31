@@ -202,9 +202,9 @@ int runpiped1(struct execargs_t** programs, size_t n, int write_to, sigset_t* sm
                 signals_unblock(smask);
                 // dup2 new descriptors to stdout, stdin
                 SAFERET(dup2(write_to, STDOUT_FILENO));
-                SAFERET(dup2(pipefd[0], STDIN_FILENO));
+                if (n > 1) SAFERET(dup2(pipefd[0], STDIN_FILENO));
                 // close init fds
-                SAFERET(close(write_to));
+                if (n > 1) SAFERET(close(write_to));
                 SAFERET(close(pipefd[0]));
                 if (execvp(programs[n-1]->name, programs[n-1]->args) == -1) {
                     perror("execvp");
@@ -301,7 +301,7 @@ int runpiped(struct execargs_t** programs, size_t n) {
                 SAFERET(kill(pid, SIGINT));
             } else if (sig == SIGCHLD) {
                 SAFERET(waitpid(pid, &status, WNOHANG));
-                retvalue = siginfo.si_status;
+                retvalue = WEXITSTATUS(status);
                 break;
             }
         }
