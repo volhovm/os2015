@@ -85,7 +85,7 @@ ssize_t buf_getline(fd_t fd, struct buf_t* buf, char* dest) {
             }
         }
         got = buf_fill(fd, buf, 1);
-        if (got == 0) return 1;
+        if (got == 0) return -1;
         if (size == got) {
             memmove(dest, buf->data, buf->size);
             dest[got] = 0;

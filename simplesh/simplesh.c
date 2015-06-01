@@ -44,16 +44,13 @@ int main() {
         }
         commands_n = 0;
         got = buf_getline(STDIN_FILENO, buf, current);
-        //got = read(STDIN_FILENO, buf, 20);
-        current_copy = strdup(current);
         if (got == -1) {
+            if (feof(stdin)) break; // just EOF
             signals_unblock(&smask);
             return -1;
         }
         if (got == 0) continue;
-        if (got == 1) { // that's eof
-            break;
-        }
+        current_copy = strdup(current);
         while ((token = strsep(&current_copy, "|")) != NULL) {
             commands[commands_n++] = token;
         }
