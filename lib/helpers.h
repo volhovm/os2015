@@ -14,5 +14,8 @@ struct execargs_t {
 struct execargs_t* execargs_new(char* name, char** args);
 struct execargs_t* execargs_fromargs(char** args);
 int exec(struct execargs_t* args);
+int signals_first(const sigset_t* smask);
+int signals_unblock(const sigset_t* smask);
+int runpiped1(struct execargs_t** programs, size_t n, int write_to, sigset_t* smask);
 int runpiped(struct execargs_t** programs, size_t n);
 #endif

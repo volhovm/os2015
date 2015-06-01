@@ -103,6 +103,14 @@ struct execargs_t* execargs_fromargs(char** args) {
     return execargs_new(args[0], args);
 }
 
+sigset_t intchldmask() {
+    sigset_t ret;
+    sigemptyset(&ret);
+    sigaddset(&ret, SIGINT);
+    sigaddset(&ret, SIGCHLD);
+    return ret;
+}
+
 // executes a given program.
 // returns exit status of program
 int exec(struct execargs_t* prog) {
@@ -174,9 +182,9 @@ int runpiped1(struct execargs_t** programs, size_t n, int write_to, sigset_t* sm
         close(pipefd[0]);
         if (n == 1) {
             SAFERET(close(pipefd[1]));
-            return 0;
+            exit(0);
         } else {
-            return runpiped1(programs, n - 1, pipefd[1], smask);
+            exit(runpiped1(programs, n - 1, pipefd[1], smask));
         }
     } else {
         siginfo_t siginfo;
@@ -273,29 +281,39 @@ int runpiped1(struct execargs_t** programs, size_t n, int write_to, sigset_t* sm
 }
 
 int runpiped(struct execargs_t** programs, size_t n) {
-    sigset_t smask;
-    sigemptyset(&smask);
-    sigaddset(&smask, SIGINT);
-    sigaddset(&smask, SIGCHLD);
-    sigprocmask(SIG_BLOCK, &smask, NULL);
+    // create a mask that contains {SIGINT, SIGCHLD} \ {current mask}
+    sigset_t smask, sdelmask, sinitmask;
+    smask = intchldmask();
+    sigemptyset(&sdelmask);
+    sigprocmask(SIG_SETMASK, NULL, &sinitmask);
+    if (!sigismember(&sinitmask, SIGINT)) {
+        sigaddset(&sdelmask, SIGINT);
+    }
+    if (!sigismember(&sinitmask, SIGCHLD)) {
+        sigaddset(&sdelmask, SIGCHLD);
+    }
+    sigprocmask(SIG_BLOCK, &sdelmask, NULL);
 
+    // start programs in child, wait for them in parent
     int pid = fork();
+    if (pid == -1) return -1;
     if (pid == 0) {
         int res = runpiped1(programs, n, STDOUT_FILENO, &smask);
-        signals_unblock(&smask);
-        return res;
+        printf("master-child: %d\n", res);
+        signals_unblock(&sdelmask);
+        exit(res);
     } else {
-        printf("master:: Forked init: %d\n", pid);
         // wait for any signal
         siginfo_t siginfo;
         int sig, status, retvalue = 0;
 
+        printf("master:: Forked init: %d\n", pid);
+
         // kill child in case of SIGINT, in case of SIGCHLD exit normally
         while (1) {
             sig = sigwaitinfo(&smask, &siginfo);
-            SAFERET(sig);
-
             printf("master:: sig is %d\n", sig);
+            SAFERET(sig);
 
             if (sig == SIGINT) {
                 SAFERET(kill(pid, SIGINT));
@@ -305,7 +323,8 @@ int runpiped(struct execargs_t** programs, size_t n) {
                 break;
             }
         }
-        signals_unblock(&smask);
+        signals_unblock(&sdelmask);
+        printf("exited from master\n");
         return retvalue;
     }
 }
