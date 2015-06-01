@@ -20,14 +20,13 @@ int main() {
     sigprocmask(SIG_BLOCK, &smask, NULL);
 
     //char* args_raw1[] = {"sleep", "5", NULL};
-    ////char* args_raw2[] = {"sleep", "5", NULL};
+    //char* args_raw2[] = {"ls", "/bin", NULL};
     //struct execargs_t* pgs[10];
     //pgs[0] = execargs_fromargs(args_raw1);
-    ////programs[1] = execargs_fromargs(args_raw2);
-    //int reslt = runpiped(pgs, 1);
+    //pgs[1] = execargs_fromargs(args_raw2);
+    //int reslt = runpiped(pgs, 2);
     //printf("retcode: %d", reslt);
     //return reslt;
-
 
     int commands_n, args_n, res, i, j, terminated, got;
     char c;
@@ -38,7 +37,7 @@ int main() {
     char* parsed[30][40]; // 30 commands, up to 39 arguments each
     struct execargs_t* programs[30];
     while (running) {
-        res = write(STDOUT_FILENO, "$ ", 2);
+        res = write(STDOUT_FILENO, "$", 2);
         if (res == -1 || res == 0) { // something is utterly wrong
             signals_unblock(&smask);
             return -1;
@@ -47,7 +46,6 @@ int main() {
         got = buf_getline(STDIN_FILENO, buf, current);
         //got = read(STDIN_FILENO, buf, 20);
         current_copy = strdup(current);
-        printf("got %d read\n", got);
         if (got == -1) {
             signals_unblock(&smask);
             return -1;
@@ -59,7 +57,6 @@ int main() {
         while ((token = strsep(&current_copy, "|")) != NULL) {
             commands[commands_n++] = token;
         }
-        printf("Scanned all programs, length: %d\n", commands_n);
         for (i = 0; i < commands_n; i++) {
             args_n = 0;
             current_copy = strdup(commands[i]);
@@ -69,11 +66,13 @@ int main() {
             }
             parsed[i][args_n] = NULL; // terminate the sequence
             programs[i] = execargs_fromargs(parsed[i]);
-            printf("parsing: programm #%d, tokens: %d\n", i, args_n);
         }
 
         res = runpiped(programs, commands_n);
-        printf("exited with code %d\n", res);
+        if (res == -1) {
+            res = write(STDOUT_FILENO, "exited with code -1\n", 21);
+            if (res == -1) return -1;
+        }
     }
     signals_unblock(&smask);
     return 0;

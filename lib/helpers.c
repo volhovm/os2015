@@ -34,9 +34,7 @@ ssize_t read_until(int fd, void* buf, size_t count, char delimiter) {
 ssize_t read_(int fd, void* buf, size_t count) {
     int got_overall = 0;
     while (1) {
-        printf("TEST");
         int got = read(fd, buf, count);
-        printf("TEST_AFTER");
         if (got == -1) return -1;
         if (got == 0) break;
         fflush(stdout);
@@ -44,7 +42,6 @@ ssize_t read_(int fd, void* buf, size_t count) {
         buf += got;
         count -= got;
     }
-    printf("READ_ EXIT");
     fflush(stdout);
 
     return got_overall;
@@ -190,7 +187,9 @@ int runpiped1(struct execargs_t** programs, size_t n, int write_to, sigset_t* sm
         siginfo_t siginfo;
         int childkilled = 0;
         int retcode = 0;
+#ifdef DEBUG
         printf("depth %zu:: Forked: %d\n", n, pid);
+#endif
         close(pipefd[1]);
 
         // process all signals that could be generated up to this point
@@ -212,7 +211,7 @@ int runpiped1(struct execargs_t** programs, size_t n, int write_to, sigset_t* sm
                 SAFERET(dup2(write_to, STDOUT_FILENO));
                 if (n > 1) SAFERET(dup2(pipefd[0], STDIN_FILENO));
                 // close init fds
-                if (n > 1) SAFERET(close(write_to));
+                if (write_to != STDOUT_FILENO) SAFERET(close(write_to));
                 SAFERET(close(pipefd[0]));
                 if (execvp(programs[n-1]->name, programs[n-1]->args) == -1) {
                     perror("execvp");
@@ -221,14 +220,21 @@ int runpiped1(struct execargs_t** programs, size_t n, int write_to, sigset_t* sm
             } else {
                 int execed_dead = 0;
                 int newpid;
+#ifdef DEBUG
                 printf("depth %zu:: exec'ed %d\n", n, cpid);
+#endif
                 // sent SIGINT to child if needed and wait for its execution end
                 while (!execed_dead) {
+#ifdef DEBUG
                     printf("depth %zu:: waiting for a signal after exec\n", n);
+#endif
                     sig = sigwaitinfo(smask, &siginfo);
                     SAFERET(sig);
                     if (sig == SIGINT) {
+
+#ifdef DEBUG
                         printf("depth %zu:: got sigint, relaying it to exec-chld (%d)\n", n, cpid);
+#endif
                         SAFERET(kill(cpid, SIGINT));
                         if (!childkilled) {
                             //printf("depth %zu:: and to direct child %d\n", n, pid);
@@ -245,11 +251,17 @@ int runpiped1(struct execargs_t** programs, size_t n, int write_to, sigset_t* sm
                             if (newpid == pid) {
                                 retcode = siginfo.si_status;
                                 childkilled = 1;
+
+#ifdef DEBUG
                                 printf("depth %zu:: previous-chain child #%d died\n", n, pid);
+#endif
                             } else if (newpid == cpid) {
                                 SAFERET(close(pipefd[0]));
                                 execed_dead = 1;
+
+#ifdef DEBUG
                                 printf("depth %zu:: exec'ed child #%d has finished\n", n, cpid);
+#endif
                             }
                         }
                     }
@@ -259,11 +271,15 @@ int runpiped1(struct execargs_t** programs, size_t n, int write_to, sigset_t* sm
             // or child death (if it hasn't happened due to this point).
         }
 
+#ifdef DEBUG
         printf("depth %zu:: before last while\n", n);
+#endif
         while (!childkilled) {
             sig = sigwaitinfo(smask, &siginfo);
             SAFERET(sig);
+#ifdef DEBUG
             printf("depth %zu:: got signal %d in last while\n", n, sig);
+#endif
             // if got SIGCHLD, wait pid, save return code and return
             // if got signal from parent (SIGINT), propagate to child and wait for SIGCHLD
             if (sig == SIGINT) {
@@ -275,7 +291,9 @@ int runpiped1(struct execargs_t** programs, size_t n, int write_to, sigset_t* sm
                 childkilled = 1;
             }
         }
+#ifdef DEBUG
         printf("depth %zu:: exiting\n", n);
+#endif
         return retcode;
     }
 }
@@ -299,7 +317,9 @@ int runpiped(struct execargs_t** programs, size_t n) {
     if (pid == -1) return -1;
     if (pid == 0) {
         int res = runpiped1(programs, n, STDOUT_FILENO, &smask);
+#ifdef DEBUG
         printf("master-child: %d\n", res);
+#endif
         signals_unblock(&sdelmask);
         exit(res);
     } else {
@@ -307,12 +327,16 @@ int runpiped(struct execargs_t** programs, size_t n) {
         siginfo_t siginfo;
         int sig, status, retvalue = 0;
 
+#ifdef DEBUG
         printf("master:: Forked init: %d\n", pid);
+#endif
 
         // kill child in case of SIGINT, in case of SIGCHLD exit normally
         while (1) {
             sig = sigwaitinfo(&smask, &siginfo);
+#ifdef DEBUG
             printf("master:: sig is %d\n", sig);
+#endif
             SAFERET(sig);
 
             if (sig == SIGINT) {
@@ -324,7 +348,9 @@ int runpiped(struct execargs_t** programs, size_t n) {
             }
         }
         signals_unblock(&sdelmask);
+#ifdef DEBUG
         printf("exited from master\n");
+#endif
         return retvalue;
     }
 }
