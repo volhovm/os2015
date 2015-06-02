@@ -11,3 +11,5 @@ filter/filter
 bufcat/bufcat
 buffilter/buffilter
 simplesh/simplesh
+test
+*test*

@@ -31,14 +31,16 @@ int main() {
         res = write(STDOUT_FILENO, "$", 2);
         if (res == -1 || res == 0) { // something is utterly wrong
             signals_unblock(&smask);
-            return -1;
+            buf_free(buf);
+            exit(EXIT_FAILURE);
         }
         commands_n = 0;
         got = buf_getline(STDIN_FILENO, buf, current);
         if (got == -1) {
             if (feof(stdin)) break; // just EOF
             signals_unblock(&smask);
-            return -1;
+            buf_free(buf);
+            exit(EXIT_FAILURE);
         }
         if (got == 0) continue;
         current_copy = strdup(current);
@@ -63,5 +65,6 @@ int main() {
         }
     }
     signals_unblock(&smask);
-    return 0;
+    buf_free(buf);
+    exit(EXIT_SUCCESS);
 }
