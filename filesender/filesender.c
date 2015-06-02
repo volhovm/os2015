@@ -4,6 +4,7 @@
 #include <sys/stat.h>
 #include <sys/socket.h>
 #include <fcntl.h>
+#include <wait.h>
 #include <stdlib.h>
 #include <string.h>
 #include <netdb.h>
@@ -59,17 +60,38 @@ int main(int argc, char *argv[]) {
     SAFERET(listen(sfd, MAX_CONNECTIONS)); // listen accepting connections
 
     int pids[MAX_CONNECTIONS];
+    int sfds[MAX_CONNECTIONS];
     memset(pids, -1, MAX_CONNECTIONS * sizeof(int));
+    memset(sfds, -1, MAX_CONNECTIONS * sizeof(int));
     for (;;) {
         struct sockaddr address;
         socklen_t address_len;
-        int childfd;
-        childfd = accept(sfd, &address, &address_len);
+        int cfd, i, status;
+
+        // quickly poll all pids if they are finished
+        for (i = 0; i < MAX_CONNECTIONS; i++) {
+            if (pids[i] != -1) {
+                s = waitpid(pids[i], &status, WNOHANG);
+                printf("waited for pid %d\n", pids[i]);
+                if (s == -1) {
+                    printf("waitpid for pid %d failed\n", pids[i]);
+                    exit(EXIT_FAILURE);
+                }
+                close(sfds[i]);
+                sfds[i] = -1;
+                pids[i] = -1;
+            }
+        }
+
+        // accept new socket
+        cfd = accept(sfd, &address, &address_len);
         printf("accepted child, sending him something\n");
-        if (childfd == -1) {
+        if (cfd == -1) {
             printf("error while accepting: %s\n", strerror(errno));
             continue;
         }
+
+        // send file in child, track child in parent
         pid = fork();
         if (pid == -1) {
             perror("Could not fork\n");
@@ -81,6 +103,9 @@ int main(int argc, char *argv[]) {
             fd = open(argv[2], O_RDONLY);
             if (fd == -1) {
                 printf("Could not open %s, child exiting\n", argv[2]);
+                exit(EXIT_FAILURE);
+                close(cfd);
+                buf_free(buf);
             }
             for (;;) {
                 prevsize = buf_size(buf);
@@ -89,15 +114,23 @@ int main(int argc, char *argv[]) {
                     while (buf_size(buf) != 0) buf_flush(fd, buf, 1);
                     break;
                 }
-                buf_flush(childfd, buf, 1);
+                buf_flush(cfd, buf, 1);
             }
             buf_free(buf);
             close(fd);
+            close(cfd);
+            printf("ended sending file to fd %d\n", cfd);
             exit(EXIT_SUCCESS);
-        } else {
-
-            printf("succesfully forked, sending %s to fd %d from pid %d\n", argv[2], childfd, pid);
         }
+        // put pid into array (first empty place)
+        for (i = 0; i < MAX_CONNECTIONS; i++) {
+            if (pids[i] == -1) {
+                pids[i] = pid;
+                sfds[i] = cfd;
+                break;
+            }
+        }
+        printf("succesfully forked, sending %s to fd %d from pid %d\n", argv[2], cfd, pid);
     }
     return 1;
 }
