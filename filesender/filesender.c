@@ -41,7 +41,6 @@ int main(int argc, char *argv[]) {
         printf("Getaddrinfo failed: %s\n", gai_strerror(s));
         exit(EXIT_FAILURE);
     }
-    printf("Mda1...\n");
     for (rp = result; rp != NULL; rp = rp->ai_next) {
         sfd = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
         if (sfd == -1) continue;
@@ -59,6 +58,7 @@ int main(int argc, char *argv[]) {
     freeaddrinfo(result); // not needed anymore
     SAFERET(listen(sfd, MAX_CONNECTIONS)); // listen accepting connections
 
+    printf("Starting accepting clients\n");
     int pids[MAX_CONNECTIONS];
     int sfds[MAX_CONNECTIONS];
     memset(pids, -1, MAX_CONNECTIONS * sizeof(int));
@@ -110,11 +110,26 @@ int main(int argc, char *argv[]) {
             for (;;) {
                 prevsize = buf_size(buf);
                 got = buf_fill(fd, buf, 1);
-                if (prevsize == buf_size(buf)) {
+                if (got == -1) {
+                    buf_free(buf);
+                    close(fd);
+                    close(cfd);
+                    printf("Couldn't fill buffer from child, exiting");
+                    exit(EXIT_FAILURE);
+                }
+                // eof
+                if (prevsize == got) {
                     while (buf_size(buf) != 0) buf_flush(fd, buf, 1);
                     break;
                 }
-                buf_flush(cfd, buf, 1);
+                got = buf_flush(cfd, buf, 1);
+                if (got == -1) {
+                    buf_free(buf);
+                    close(fd);
+                    close(cfd);
+                    printf("Couldn't fill buffer from child, exiting");
+                    exit(EXIT_FAILURE);
+                }
             }
             buf_free(buf);
             close(fd);
