@@ -3,7 +3,8 @@
 #include <unistd.h>
 #include <bufio.h>
 #include <signal.h>
-#include <stdlib.h> #include <string.h>
+#include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 
 int running = 1;
