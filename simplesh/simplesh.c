@@ -3,8 +3,7 @@
 #include <unistd.h>
 #include <bufio.h>
 #include <signal.h>
-#include <stdlib.h>
-#include <string.h>
+#include <stdlib.h> #include <string.h>
 #include <stdio.h>
 
 int running = 1;
@@ -18,15 +17,6 @@ int main() {
     sigemptyset(&smask);
     sigaddset(&smask, SIGINT);
     sigprocmask(SIG_BLOCK, &smask, NULL);
-
-    //char* args_raw1[] = {"sleep", "5", NULL};
-    //char* args_raw2[] = {"ls", "/bin", NULL};
-    //struct execargs_t* pgs[10];
-    //pgs[0] = execargs_fromargs(args_raw1);
-    //pgs[1] = execargs_fromargs(args_raw2);
-    //int reslt = runpiped(pgs, 2);
-    //printf("retcode: %d", reslt);
-    //return reslt;
 
     int commands_n, args_n, res, i, j, terminated, got;
     char c;
