@@ -13,3 +13,5 @@ buffilter/buffilter
 simplesh/simplesh
 test
 *test*
+bipiper/forking
+bipiper/polling

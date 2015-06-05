@@ -67,7 +67,7 @@ ssize_t buf_flush(fd_t fd, struct buf_t *buf, size_t required) {
     }
     memmove(buf->data, buf->data + written, prev_size - written);
     buf->size = prev_size - written;
-    return buf->size - prev_size;
+    return prev_size - buf->size;
 }
 
 ssize_t buf_getline(fd_t fd, struct buf_t* buf, char* dest) {
