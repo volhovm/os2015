@@ -23,6 +23,7 @@ void assume(int res) { }
 
 #define SAFERET(a) { if (a != 0) return -1; }
 
+int ONE_WAY_CONNECTION_ALLOWED = 1;
 int MAX_SOCKETS = 128;
 int BUFFER_SIZE = 4096;
 int VERBOSE = 1;
@@ -126,9 +127,8 @@ int main(int argc, char *argv[]) {
 
         logm(STDOUT_FILENO, "\nBefore poll\n");
         num = poll(pollfds, size * 2, -1);
-        logm(STDOUT_FILENO, "Got from poll: %d\n", num);
+        //logm(STDOUT_FILENO, "Got from poll: %d\n", num);
         for (i = 0; i < 2 * size; i++) {
-
             if (pollfds[i].revents != 0) {
                 snd = i % 2;
                 if (snd) {
@@ -181,8 +181,8 @@ int main(int argc, char *argv[]) {
                     }
                     break;
                 default:
-                    logm(STDOUT_FILENO, "Something happend on %d\n", i);
-                    dump_mask(pollfds[i].revents);
+                    //logm(STDOUT_FILENO, "Something happend on %d\n", i);
+                    //dump_mask(pollfds[i].revents);
                     // POLLIN
                     if (pollfds[i].revents & POLLIN) {
                         logm(STDOUT_FILENO, "Pollin on %d\n", i);
@@ -285,8 +285,13 @@ int main(int argc, char *argv[]) {
             }
         }
         for (i = 0; i < size; i++) {
-            if (!valid_in[2*i] && !valid_in[2*i+1] &&
-                !valid_out[2*i] && !valid_out[2*i+1]) {
+
+            if (// if ONE_WAY_CONNECTION_ALLOWED, then disconnect if all 4 are invalid
+                !valid_in[2*i] && !valid_in[2*i+1] && !valid_out[2*i] && !valid_out[2*i+1]
+                && ONE_WAY_CONNECTION_ALLOWED ||
+                // else check if at least one pair is invalid
+                (!valid_in[2*i] && !valid_in[2*i+1]) || (!valid_out[2*i] && !valid_out[2*i+1])
+                ) {
                 logm(STDOUT_FILENO, "Closing pair %d\n", i);
                 // close everything that needs to be closed
                 close(pollfds[2*i].fd);
