@@ -287,10 +287,10 @@ int main(int argc, char *argv[]) {
         for (i = 0; i < size; i++) {
 
             if (// if ONE_WAY_CONNECTION_ALLOWED, then disconnect if all 4 are invalid
-                !valid_in[2*i] && !valid_in[2*i+1] && !valid_out[2*i] && !valid_out[2*i+1]
-                && ONE_WAY_CONNECTION_ALLOWED ||
+                (!valid_in[2*i] && !valid_in[2*i+1] && !valid_out[2*i] && !valid_out[2*i+1]
+                 && ONE_WAY_CONNECTION_ALLOWED) ||
                 // else check if at least one pair is invalid
-                (!valid_in[2*i] && !valid_in[2*i+1]) || (!valid_out[2*i] && !valid_out[2*i+1])
+                ((!valid_in[2*i] && !valid_in[2*i+1]) || (!valid_out[2*i] && !valid_out[2*i+1]))
                 ) {
                 logm(STDOUT_FILENO, "Closing pair %d\n", i);
                 // close everything that needs to be closed
@@ -301,11 +301,14 @@ int main(int argc, char *argv[]) {
 
                 // swap with last elements if there are more than one pair of connections
                 if (size > 2) {
-                    valid_in[2*i] = valid_in[size*2];
-                    valid_in[2*i+1] = valid_in[size*2+1];
-                    pollfds[2*i] = pollfds[size*2];
-                    pollfds[2*i+1] = pollfds[size*2+1];
-                    bufs[i] = bufs[size];
+                    logm(STDOUT_FILENO, "Swapping %d\n", i);
+                    valid_in[2*i] = valid_in[(size-1)*2];
+                    valid_in[2*i+1] = valid_in[(size-1)*2+1];
+                    valid_out[2*i] = valid_out[(size-1)*2];
+                    valid_out[2*i+1] = valid_out[(size-1)*2+1];
+                    pollfds[2*i] = pollfds[(size-1)*2];
+                    pollfds[2*i+1] = pollfds[(size-1)*2+1];
+                    bufs[i] = bufs[size-1];
                 }
                 size--;
                 logm(STDOUT_FILENO, "Closed pair %d\n", i);
