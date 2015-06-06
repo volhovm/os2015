@@ -21,8 +21,8 @@ void assume(int res) { }
 
 #define SAFERET(a) { if (a != 0) return -1; }
 
-int MAX_CONNECTIONS = 500;
-int pids[500], sockets[500];
+#define MAX_CONNECTIONS 500
+int pids[MAX_CONNECTIONS], sockets[MAX_CONNECTIONS];
 char *USAGE = "Usage: ./filesender port filename";
 
 void sig_handler(int signo) {
@@ -33,7 +33,7 @@ void sig_handler(int signo) {
             if (pids[i] != -1) {
                 // try wait
                 res = waitpid(pids[i], &status, WNOHANG);
-                printf("waitpid for pid %d returned %d\n", pids[i], res);
+                //printf("waitpid for pid %d returned %d\n", pids[i], res);
                 if (res != pids[i]) continue;
                 // if succeeded, close socket
                 res = close(sockets[i]);
