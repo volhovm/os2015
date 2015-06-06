@@ -22,7 +22,30 @@ void assume(int res) { }
 #define SAFERET(a) { if (a != 0) return -1; }
 
 int MAX_CONNECTIONS = 500;
+int pids[500], sockets[500];
 char *USAGE = "Usage: ./filesender port filename";
+
+void sig_handler(int signo) {
+    printf("In handler\n");
+    if (signo == SIGCHLD) {
+        int i, status, res;
+        for (i = 0; i < MAX_CONNECTIONS; i++) {
+            if (pids[i] != -1) {
+                // try wait
+                res = waitpid(pids[i], &status, WNOHANG);
+                printf("waitpid for pid %d returned %d\n", pids[i], res);
+                if (res != pids[i]) continue;
+                // if succeeded, close socket
+                res = close(sockets[i]);
+                if (res == -1) printf("Couldn't close socket for child %d\n", pids[i]);
+                printf("Ended waiting for pid %d\n", pids[i]);
+                pids[i] = -1;
+                sockets[i] = -1;
+                status = 0;
+            }
+        }
+    }
+}
 
 int main(int argc, char *argv[]) {
     if (argc != 3) {
@@ -58,38 +81,27 @@ int main(int argc, char *argv[]) {
     freeaddrinfo(result); // not needed anymore
     SAFERET(listen(sfd, MAX_CONNECTIONS)); // listen accepting connections
 
+    // prevent zombie creation
+    struct sigaction sa;
+    bzero(&sa, sizeof(sa));
+    sa.sa_handler = &sig_handler;
+    sigaction(SIGCHLD, &sa, NULL);
+
     printf("Starting accepting clients\n");
-    int pids[MAX_CONNECTIONS];
-    int sfds[MAX_CONNECTIONS];
     memset(pids, -1, MAX_CONNECTIONS * sizeof(int));
-    memset(sfds, -1, MAX_CONNECTIONS * sizeof(int));
-    for (;;) {
+    memset(sockets, -1, MAX_CONNECTIONS * sizeof(int));
+    while (1) {
         struct sockaddr address;
         socklen_t address_len;
         int cfd, i, status;
 
-        // quickly poll all pids if they are finished
-        for (i = 0; i < MAX_CONNECTIONS; i++) {
-            if (pids[i] != -1) {
-                s = waitpid(pids[i], &status, WNOHANG);
-                printf("waited for pid %d\n", pids[i]);
-                if (s == -1) {
-                    printf("waitpid for pid %d failed\n", pids[i]);
-                    exit(EXIT_FAILURE);
-                }
-                close(sfds[i]);
-                sfds[i] = -1;
-                pids[i] = -1;
-            }
-        }
-
         // accept new socket
         cfd = accept(sfd, &address, &address_len);
-        printf("accepted child, sending him something\n");
         if (cfd == -1) {
-            printf("error while accepting: %s\n", strerror(errno));
+            if (errno != EINTR) printf("error while accepting: %s\n", strerror(errno));
             continue;
         }
+        printf("accepted child, sending him something\n");
 
         // send file in child, track child in parent
         pid = fork();
@@ -98,24 +110,20 @@ int main(int argc, char *argv[]) {
             exit(EXIT_FAILURE);
         }
         if (pid == 0) {
+            sleep(3);
             struct buf_t* buf = buf_new(4096);
-            int got, fd, prevsize;
+            int got, fd, prevsize, err = 0;
             fd = open(argv[2], O_RDONLY);
             if (fd == -1) {
                 printf("Could not open %s, child exiting\n", argv[2]);
-                exit(EXIT_FAILURE);
-                close(cfd);
-                buf_free(buf);
             }
-            for (;;) {
+            while (!err) {
                 prevsize = buf_size(buf);
                 got = buf_fill(fd, buf, 1);
                 if (got == -1) {
-                    buf_free(buf);
-                    close(fd);
-                    close(cfd);
+                    err = 1;
                     printf("Couldn't fill buffer from child, exiting");
-                    exit(EXIT_FAILURE);
+                    break;
                 }
                 // eof
                 if (prevsize == got) {
@@ -124,28 +132,32 @@ int main(int argc, char *argv[]) {
                 }
                 got = buf_flush(cfd, buf, 1);
                 if (got == -1) {
-                    buf_free(buf);
-                    close(fd);
-                    close(cfd);
-                    printf("Couldn't fill buffer from child, exiting");
-                    exit(EXIT_FAILURE);
+                    err = 1;
+                    printf("Couldn't flish buffer from child, exiting");
+                    break;
                 }
             }
             buf_free(buf);
             close(fd);
+            //shutdown(cfd, SHUT_RDWR);
             close(cfd);
-            printf("ended sending file to fd %d\n", cfd);
-            exit(EXIT_SUCCESS);
-        }
-        // put pid into array (first empty place)
-        for (i = 0; i < MAX_CONNECTIONS; i++) {
-            if (pids[i] == -1) {
-                pids[i] = pid;
-                sfds[i] = cfd;
-                break;
+            if (err) {
+                exit(EXIT_FAILURE);
+            } else {
+                printf("ended sending file to fd %d\n", cfd);
+                exit(EXIT_SUCCESS);
+            }
+        } else {
+            for (i = 0; i < MAX_CONNECTIONS; i++) {
+                if (pids[i] == -1 && sockets[i] == -1) {
+                    pids[i] = pid;
+                    sockets[i] = cfd;
+                    printf("succesfully forked, sending %s to fd %d from pid %d\n",
+                           argv[2], cfd, pid);
+                    break;
+                }
             }
         }
-        printf("succesfully forked, sending %s to fd %d from pid %d\n", argv[2], cfd, pid);
     }
     return 1;
 }
