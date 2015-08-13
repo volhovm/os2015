@@ -17,6 +17,7 @@ ssize_t read_until(int fd, void* buf, size_t count, char delimiter) {
     int delimiter_found = 0;
     while (count > got_chars && !delimiter_found) {
         int got = read(fd, buf, count);
+        if (got == -1) return -1;
         if (got == 0) break;
         int i;
         got_chars += got;

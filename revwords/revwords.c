@@ -6,11 +6,13 @@
 
 int BUFFER_SIZE = 4096;
 
-void main() {
+int main() {
+    int res;
     char buf[BUFFER_SIZE];
     int margin = 0;
     while (1) {
-        int got = read_until(STDIN_FILENO, buf + margin, BUFFER_SIZE / 4, ' ');
+        int got = read_until(STDIN_FILENO, buf + margin, BUFFER_SIZE, ' ');
+        if (got == -1) return -1;
         if (got == 0) {
             int j;
             for (j = 0; j < margin / 2; j++) {
@@ -34,8 +36,10 @@ void main() {
                     currstr[tmpsize - j - 1] = currstr[j];
                     currstr[j] = temp;
                 }
-                write_(STDOUT_FILENO, currstr, tmpsize);
-                write_(STDOUT_FILENO, " ", 1);
+                res = write_(STDOUT_FILENO, currstr, tmpsize);
+                if (res == -1) return -1;
+                res = write_(STDOUT_FILENO, " ", 1);
+                if (res == -1) return -1;
                 fflush(stdout);
                 last_mark = i + 1;
             }
@@ -43,4 +47,5 @@ void main() {
         memmove(buf, buf + last_mark * sizeof (char), got + margin - last_mark + 1);
         margin = got + margin - last_mark;
     }
+    return 0;
 }

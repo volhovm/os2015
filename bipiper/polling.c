@@ -52,6 +52,7 @@ void dump_mask(short mask) {
            mask & POLLHUP,
            mask & POLLNVAL);
 }
+
 // initializes server sockets {bind; listen}
 int init_sfd(char *port, int *sfd, struct addrinfo **result, struct addrinfo *hints) {
     int s, one = 1;
@@ -125,9 +126,9 @@ int main(int argc, char *argv[]) {
         int cfd1, cfd2, i, num, snd, twin;
         struct buf_t *fbuf, *bbuf; // buffer from you to twin, and backwards
 
-        logm(STDOUT_FILENO, "\nBefore poll\n");
+        logm(STDOUT_FILENO, "\nBefore poll, size: %d\n", size);
         num = poll(pollfds, size * 2, -1);
-        //logm(STDOUT_FILENO, "Got from poll: %d\n", num);
+        logm(STDOUT_FILENO, "Got from poll: %d\n", num);
         for (i = 0; i < 2 * size; i++) {
             if (pollfds[i].revents != 0) {
                 snd = i % 2;
@@ -203,7 +204,9 @@ int main(int argc, char *argv[]) {
                             pollfds[i].events &= ~POLLIN;
                             logm(STDOUT_FILENO, "Buffer is full, ~POLLIN\n");
                             break;
-                        } else s = buf_fill(pollfds[i].fd, fbuf, 1);
+                        } else {
+                            s = buf_fill(pollfds[i].fd, fbuf, 1);
+                        }
 
                         // tried to fill and got error or eof ⇒
                         // can't read from it, unsubscribe from reads, mark as invalid
@@ -211,7 +214,8 @@ int main(int argc, char *argv[]) {
                             pollfds[i].events &= ~POLLIN;
                             valid_in[i] = 0;
                             shutdown(pollfds[i].fd, SHUT_RD);
-                            logm(STDOUT_FILENO, "Failed to fill buffer, ~POLLING, unvaliding\n");
+                            logm(STDOUT_FILENO, "Failed to fill buffer (possible eof)"
+                                                ", ~POLLING, unvaliding\n");
                         }
 
                         // subscribe read side to reading, as buffer is not empty now
@@ -298,6 +302,8 @@ int main(int argc, char *argv[]) {
                 close(pollfds[2*i+1].fd);
                 buf_free(bufs[i].b1);
                 buf_free(bufs[i].b2);
+                pollfds[2*i].revents = pollfds[2*i].events = 0;
+                pollfds[2*i+1].revents = pollfds[2*i+1].events = 0;
 
                 // swap with last elements if there are more than one pair of connections
                 if (size > 2) {
